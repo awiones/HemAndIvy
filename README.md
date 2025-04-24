@@ -8,7 +8,7 @@ A modern, robust platform for managing and showcasing auctions, products, and co
 
 | Home Page                                  | About Page                                   | Auctions Page                                      |
 | ------------------------------------------ | -------------------------------------------- | -------------------------------------------------- |
-| ![Home Preview](docs/screenshots/home.png) | ![About Preview](docs/screenshots/about.png) | ![Auctions Preview](docs/screenshots/auctions.png) |
+| ![Home Preview](docs/screenshots/home.PNG) | ![About Preview](docs/screenshots/about.PNG) | ![Auctions Preview](docs/screenshots/auctions.PNG) |
 
 > _Preview of the Hem & Ivy web application UI_
 
