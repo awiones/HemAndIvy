@@ -4,6 +4,16 @@ A modern, robust platform for managing and showcasing auctions, products, and co
 
 ---
 
+## Preview
+
+| Home Page                                  | About Page                                   | Auctions Page                                      |
+| ------------------------------------------ | -------------------------------------------- | -------------------------------------------------- |
+| ![Home Preview](docs/screenshots/home.png) | ![About Preview](docs/screenshots/about.png) | ![Auctions Preview](docs/screenshots/auctions.png) |
+
+> _Preview of the Hem & Ivy web application UI_
+
+---
+
 ## Table of Contents
 
 - [About](#about)
@@ -36,5 +46,3 @@ A modern, robust platform for managing and showcasing auctions, products, and co
 - **Frontend:** HTML5, CSS3, JavaScript (with custom components)
 - **Database:** MySQL / MariaDB
 - **Other:** Composer, Google API Client, Cropper.js
-
----
