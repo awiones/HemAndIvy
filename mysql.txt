@@ -1,0 +1,61 @@
+# THIS MYSQL.TXT IS FOR AI SEE THE BEHIND OF THE DATABASE OF THE DEV TO LEARN IT SO THEY DONT MESSED UP AND FOR AI DO NOT CHANGE ANYTHING IN HERE IF THERE'S NEED UPDATE THEY JUST NEED TO PUT ON THE CHAT BOX OF ADDED NEW STUFF
+
+-- Users table for registration and login
+CREATE TABLE `users` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `username` VARCHAR(50) NOT NULL UNIQUE,
+    `email` VARCHAR(100) NOT NULL UNIQUE,
+    `password_hash` VARCHAR(255) NOT NULL,
+    `role` ENUM('admin', 'seller', 'user') NOT NULL DEFAULT 'user',
+    `google_id` VARCHAR(64) NULL UNIQUE,
+    `avatar_url` VARCHAR(255) NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Add columns for Google OAuth support
+ALTER TABLE `users`
+    ADD COLUMN `google_id` VARCHAR(64) NULL UNIQUE AFTER `role`,
+    ADD COLUMN `avatar_url` VARCHAR(255) NULL AFTER `google_id`;
+
+-- Auctions table
+CREATE TABLE `auctions` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `title` VARCHAR(255) NOT NULL,
+    `price` DECIMAL(10,2) NOT NULL,
+    `description` TEXT NOT NULL,
+    `rarity` VARCHAR(50) NOT NULL,
+    `image` VARCHAR(255) NOT NULL,
+    `status` ENUM('active','completed') NOT NULL DEFAULT 'active',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `end_time` DATETIME NULL,
+    `category_id` INT UNSIGNED NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Categories table (stores unique category names)
+CREATE TABLE `categories` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `name` VARCHAR(100) NOT NULL UNIQUE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Populate categories table with unique categories from auctions
+INSERT IGNORE INTO categories (name)
+SELECT DISTINCT category FROM auctions WHERE category IS NOT NULL AND category != '';
+
+-- Update auctions to reference categories by id
+UPDATE auctions a
+JOIN categories c ON a.category = c.name
+SET a.category_id = c.id;
+
+-- (Optional) Remove old category column if no longer needed
+-- ALTER TABLE `auctions` DROP COLUMN `category`;
+
+-- Make sure the category_id column exists before adding the foreign key constraint
+ALTER TABLE `auctions`
+    ADD COLUMN `category_id` INT UNSIGNED NULL AFTER `end_time`;
+
+-- Add foreign key constraint
+ALTER TABLE `auctions`
+    ADD CONSTRAINT `fk_auctions_category`
+    FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`)
+    ON DELETE SET NULL ON UPDATE CASCADE;
