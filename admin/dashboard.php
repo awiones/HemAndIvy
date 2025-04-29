@@ -72,13 +72,59 @@ $stats = [
     'revenue' => 156780
 ];
 
-// Recent activity mock data
-$recentActivity = [
-    ['type' => 'auction', 'title' => 'Vintage Mahogany Writing Desk', 'status' => 'completed', 'date' => '2025-04-22'],
-    ['type' => 'user', 'title' => 'Elizabeth C. registered', 'status' => 'new', 'date' => '2025-04-23'],
-    ['type' => 'bid', 'title' => 'New bid on Art Deco Lamp', 'status' => 'pending', 'date' => '2025-04-24'],
-    ['type' => 'auction', 'title' => 'Handcrafted Silver Candelabra', 'status' => 'active', 'date' => '2025-04-24'],
-];
+// Recent activity from MySQL (users registered, new bids, new auctions)
+$recentActivity = [];
+try {
+    // New user registrations
+    $stmt = $pdo->prepare("SELECT username, created_at FROM users ORDER BY created_at DESC LIMIT 5");
+    $stmt->execute();
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $recentActivity[] = [
+            'type' => 'user',
+            'title' => $row['username'] . ' registered',
+            'status' => 'new',
+            'date' => $row['created_at'],
+        ];
+    }
+
+    // New bids
+    $stmt = $pdo->prepare("
+        SELECT b.created_at, u.username, a.title AS auction_title
+        FROM bids b
+        LEFT JOIN users u ON b.user_id = u.id
+        LEFT JOIN auctions a ON b.auction_id = a.id
+        ORDER BY b.created_at DESC LIMIT 5
+    ");
+    $stmt->execute();
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $recentActivity[] = [
+            'type' => 'bid',
+            'title' => 'New bid by ' . ($row['username'] ?: 'Unknown') . ' on ' . ($row['auction_title'] ?: 'Auction'),
+            'status' => 'pending',
+            'date' => $row['created_at'],
+        ];
+    }
+
+    // New auctions opened
+    $stmt = $pdo->prepare("SELECT title, created_at FROM auctions ORDER BY created_at DESC LIMIT 5");
+    $stmt->execute();
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $recentActivity[] = [
+            'type' => 'auction',
+            'title' => 'Auction opened: ' . $row['title'],
+            'status' => 'active',
+            'date' => $row['created_at'],
+        ];
+    }
+
+    // Sort all activities by date descending, limit to 5
+    usort($recentActivity, function($a, $b) {
+        return strtotime($b['date']) <=> strtotime($a['date']);
+    });
+    $recentActivity = array_slice($recentActivity, 0, 5);
+} catch (Exception $e) {
+    $recentActivity = [];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -212,7 +258,7 @@ $recentActivity = [
                             </div>
                             <div class="card-body">
                                 <div class="quick-actions">
-                                    <a href="/admin/auctions/new" class="quick-action-btn">
+                                    <a href="/admin/auctions" class="quick-action-btn">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <line x1="12" y1="5" x2="12" y2="19"></line>
                                             <line x1="5" y1="12" x2="19" y2="12"></line>

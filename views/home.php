@@ -24,6 +24,16 @@ foreach ($categories as $cat) {
     $imgRow = $imgStmt->fetch(PDO::FETCH_ASSOC);
     $categoryImages[$catName] = $imgRow ? $imgRow['image'] : null;
 }
+
+// Fetch user's favorites if logged in
+$favoritedIds = [];
+if (session_status() === PHP_SESSION_NONE) session_start();
+if (!empty($_SESSION['user'])) {
+    $userId = $_SESSION['user']['id'];
+    $favStmt = $pdo->prepare("SELECT auction_id FROM favorites WHERE user_id = ?");
+    $favStmt->execute([$userId]);
+    $favoritedIds = $favStmt->fetchAll(PDO::FETCH_COLUMN, 0);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -52,7 +62,7 @@ foreach ($categories as $cat) {
                     Place your bids and elevate your wardrobe with unique finds.
                 </p>
                 <div class="hero-cta">
-                    <a href="#" class="btn btn-primary">Browse Auctions</a>
+                    <a href="/search" class="btn btn-primary">Browse Auctions</a>
                     <a href="#" class="btn btn-outline">How It Works</a>
                 </div>
             </div>
@@ -93,12 +103,16 @@ foreach ($categories as $cat) {
                                 </div>
                             <?php endif; ?>
                             <div class="bid-content">
-                                <?php if (!empty($auction['category'])): ?>
-                                    <div class="bid-category"><?= htmlspecialchars($auction['category']) ?></div>
-                                <?php endif; ?>
-                                <?php if (!empty($auction['rarity'])): ?>
-                                    <div class="bid-category" style="color:var(--sage-green);font-size:12px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">
-                                        <?= htmlspecialchars($auction['rarity']) ?>
+                                <?php if (!empty($auction['category']) || !empty($auction['rarity'])): ?>
+                                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                                        <?php if (!empty($auction['category'])): ?>
+                                            <div class="bid-category"><?= htmlspecialchars($auction['category']) ?></div>
+                                        <?php endif; ?>
+                                        <?php if (!empty($auction['rarity'])): ?>
+                                            <div class="bid-category" style="color:var(--sage-green);font-size:12px;text-transform:uppercase;letter-spacing:1px;">
+                                                <?= htmlspecialchars($auction['rarity']) ?>
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
                                 <?php endif; ?>
                                 <h3 class="bid-title"><?= htmlspecialchars($auction['title']) ?></h3>
@@ -126,9 +140,12 @@ foreach ($categories as $cat) {
                                 }
                                 ?>
                                 <div class="bid-actions">
-                                    <button class="btn btn-secondary bid-btn">Place Bid</button>
-                                    <button class="bid-favorite">
-                                        <i class="far fa-heart"></i>
+                                    <button class="btn btn-secondary bid-btn"
+                                        onclick="window.location.href='/biding/<?= urlencode(strtolower(preg_replace('/[^a-z0-9]+/', '-', $auction['title']))) ?>'">
+                                        Place Bid
+                                    </button>
+                                    <button class="bid-favorite" data-auction-id="<?= (int)$auction['id'] ?>">
+                                        <i class="<?= in_array($auction['id'], $favoritedIds) ? 'fas' : 'far' ?> fa-heart"></i>
                                     </button>
                                 </div>
                             </div>
@@ -152,10 +169,14 @@ foreach ($categories as $cat) {
                 </p>
             </div>
             <div class="categories-grid">
-                <?php if (empty($categories)): ?>
+                <?php
+                // Only show the first 4 categories
+                $displayCategories = array_slice($categories, 0, 4);
+                ?>
+                <?php if (empty($displayCategories)): ?>
                     <p style="grid-column: 1/-1; text-align:center;">No categories available.</p>
                 <?php else: ?>
-                    <?php foreach ($categories as $cat): ?>
+                    <?php foreach ($displayCategories as $cat): ?>
                         <div class="category-card">
                             <?php
                                 $catName = $cat['category'];
@@ -230,6 +251,41 @@ foreach ($categories as $cat) {
                 navbar.style.backgroundColor = 'rgba(245, 243, 239, 0.95)';
                 navbar.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.05)';
             }
+        });
+
+        // Favorite button AJAX
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.bid-favorite').forEach(function(btn) {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const auctionId = btn.getAttribute('data-auction-id');
+                    fetch('/favorite', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: 'auction_id=' + encodeURIComponent(auctionId)
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            const icon = btn.querySelector('i');
+                            if (data.favorited === false) {
+                                icon.classList.remove('fas');
+                                icon.classList.add('far');
+                                btn.title = 'Add to favorites';
+                            } else {
+                                icon.classList.remove('far');
+                                icon.classList.add('fas');
+                                btn.title = 'Favorited!';
+                            }
+                        } else if (data.error) {
+                            alert(data.error);
+                        }
+                    });
+                });
+            });
         });
     </script>
 </body>

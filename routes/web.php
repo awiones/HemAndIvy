@@ -37,9 +37,14 @@ $router->get('/about', function() {
 });
 
 // Category routes
-$router->get('/categories', function() {
+$router->get('/collections', function() {
     require __DIR__ . '/../views/categories.php';
 });
+
+// Optionally remove or comment out this line if you don't want /categories
+// $router->get('/categories', function() {
+//     require __DIR__ . '/../views/categories.php';
+// });
 
 // Authentication routes
 $router->get('/login', function() {
@@ -242,6 +247,79 @@ $router->post('/admin/auctions/new', function() {
     require __DIR__ . '/../admin/auctions_new.php';
 });
 
+// Admin categories management routes
+$router->get('/admin/categories', function() {
+    if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+        http_response_code(403);
+        require __DIR__ . '/../views/errors/403.php';
+        exit;
+    }
+    require __DIR__ . '/../admin/categories.php';
+});
+$router->post('/admin/categories', function() {
+    if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+        http_response_code(403);
+        require __DIR__ . '/../views/errors/403.php';
+        exit;
+    }
+    require __DIR__ . '/../admin/categories.php';
+});
+
+// Admin users management routes
+$router->get('/admin/users', function() {
+    if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+        http_response_code(403);
+        require __DIR__ . '/../views/errors/403.php';
+        exit;
+    }
+    require __DIR__ . '/../admin/users.php';
+});
+
+$router->get('/admin/users/new', function() {
+    if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+        http_response_code(403);
+        require __DIR__ . '/../views/errors/403.php';
+        exit;
+    }
+    require __DIR__ . '/../admin/users_new.php';
+});
+
+$router->post('/admin/users/new', function() {
+    if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+        http_response_code(403);
+        require __DIR__ . '/../views/errors/403.php';
+        exit;
+    }
+    require __DIR__ . '/../admin/users_new.php';
+});
+
+$router->get('/admin/users/edit', function() {
+    if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+        http_response_code(403);
+        require __DIR__ . '/../views/errors/403.php';
+        exit;
+    }
+    require __DIR__ . '/../admin/users_edit.php';
+});
+
+$router->post('/admin/users/edit', function() {
+    if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+        http_response_code(403);
+        require __DIR__ . '/../views/errors/403.php';
+        exit;
+    }
+    require __DIR__ . '/../admin/users_edit.php';
+});
+
+$router->get('/admin/users/delete', function() {
+    if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+        http_response_code(403);
+        require __DIR__ . '/../views/errors/403.php';
+        exit;
+    }
+    require __DIR__ . '/../admin/users_delete.php';
+});
+
 // Auction routes
 $router->get('/auctions', function() {
     require __DIR__ . '/../views/auctions/index.php';
@@ -274,8 +352,8 @@ $router->get('/admin/dashboard', function() {
     require __DIR__ . '/../admin/dashboard.php';
 });
 
-// Admin users management route
-$router->get('/admin/users', function() {
+// Add admin activity log route
+$router->get('/admin/activity', function() {
     if (empty($_SESSION['user'])) {
         http_response_code(403);
         require __DIR__ . '/../views/errors/403.php';
@@ -293,16 +371,112 @@ $router->get('/admin/users', function() {
         exit;
     }
     $_SESSION['user']['role'] = $user['role'];
-    require __DIR__ . '/../admin/users.php';
+    require __DIR__ . '/../admin/activity.php';
 });
 
-// Error handling routes
-$router->get('/404', function() {
-    http_response_code(404);
-    require __DIR__ . '/../views/errors/404.php';
+$router->get('/favorite', function() {
+    require __DIR__ . '/../views/favorite.php';
 });
 
-$router->get('/500', function() {
-    http_response_code(500);
-    require __DIR__ . '/../views/errors/500.php';
+// Add favorite route (for AJAX POST)
+$router->post('/favorite', function() {
+    if (empty($_SESSION['user'])) {
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'You must be logged in to favorite.']);
+        exit;
+    }
+    $userId = $_SESSION['user']['id'];
+    $auctionId = $_POST['auction_id'] ?? null;
+    if (!$auctionId || !is_numeric($auctionId)) {
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Invalid auction ID.']);
+        exit;
+    }
+    require_once __DIR__ . '/../config/config.php';
+    global $pdo;
+    // Check if already favorited
+    $stmt = $pdo->prepare("SELECT id FROM favorites WHERE user_id = ? AND auction_id = ?");
+    $stmt->execute([$userId, $auctionId]);
+    $favorite = $stmt->fetch();
+    if ($favorite) {
+        // Remove favorite (unfavorite)
+        $delStmt = $pdo->prepare("DELETE FROM favorites WHERE user_id = ? AND auction_id = ?");
+        $delStmt->execute([$userId, $auctionId]);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true, 'favorited' => false]);
+        exit;
+    } else {
+        // Insert favorite
+        $stmt = $pdo->prepare("INSERT INTO favorites (user_id, auction_id) VALUES (?, ?)");
+        $stmt->execute([$userId, $auctionId]);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true, 'favorited' => true]);
+        exit;
+    }
+});
+
+$router->get('/search', function() {
+    require __DIR__ . '/../views/search.php';
+});
+
+// Bidding page routes (GET and POST)
+$router->get('/biding/{slug}', function($slug) {
+    $_GET['biding_slug'] = $slug;
+    require __DIR__ . '/../views/biding.php';
+});
+$router->post('/biding/{slug}', function($slug) {
+    $_GET['biding_slug'] = $slug;
+    require __DIR__ . '/../views/biding.php';
+});
+
+// Place Bid POST handler (no need for place-bid.php file)
+$router->post('/place-bid.php', function() {
+    require_once __DIR__ . '/../config/config.php';
+    if (session_status() === PHP_SESSION_NONE) session_start();
+
+    $slug = $_GET['biding_slug'] ?? '';
+    $bidAmount = $_POST['bid_amount'] ?? '';
+    $bidAmount = floatval(str_replace(',', '', $bidAmount));
+    $redirectUrl = '/biding/' . urlencode($slug);
+
+    if (!$slug || !$bidAmount) {
+        header("Location: $redirectUrl?error=Invalid+request");
+        exit;
+    }
+
+    // Find auction by slug
+    $stmt = $pdo->query("SELECT * FROM auctions WHERE status = 'active'");
+    $auction = null;
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $titleSlug = strtolower(preg_replace('/[^a-z0-9]+/', '-', $row['title']));
+        if ($slug === $titleSlug) {
+            $auction = $row;
+            break;
+        }
+    }
+    if (!$auction) {
+        header("Location: $redirectUrl?error=Auction+not+found");
+        exit;
+    }
+
+    // Validate bid
+    if ($bidAmount < 0.5) {
+        header("Location: $redirectUrl?error=Minimum+raise+is+$0.50");
+        exit;
+    }
+    if ($bidAmount <= 0) {
+        header("Location: $redirectUrl?error=Raise+amount+must+be+greater+than+zero");
+        exit;
+    }
+
+    // Update price
+    $newPrice = $auction['price'] + $bidAmount;
+    $stmt = $pdo->prepare("UPDATE auctions SET price = ? WHERE id = ?");
+    if ($stmt->execute([$newPrice, $auction['id']])) {
+        header("Location: $redirectUrl?success=Your+bid+was+placed+successfully");
+        exit;
+    } else {
+        header("Location: $redirectUrl?error=Failed+to+place+bid");
+        exit;
+    }
 });

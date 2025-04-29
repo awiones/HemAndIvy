@@ -9,14 +9,37 @@
             <ul class="nav-links">
                 <li><a href="/home"><i class="fas fa-home"></i> Home</a></li>
                 <li><a href="/auction"><i class="fas fa-gavel"></i> Auctions</a></li>
-                <li><a href="#"><i class="fas fa-tshirt"></i> Collections</a></li>
+                <li><a href="/collections"><i class="fas fa-tshirt"></i> Collections</a></li>
                 <li><a href="/about"><i class="fas fa-info-circle"></i> About</a></li>
-                <li><a href="#"><i class="fas fa-heart"></i> Favorites</a></li>
+                <li><a href="/favorite"><i class="fas fa-heart"></i> Favorites</a></li>
             </ul>
             <?php if (empty($_SESSION['user'])): ?>
                 <a href="/login" class="btn btn-primary nav-signin-btn">Sign In</a>
             <?php else: ?>
-                <a href="/logout" class="btn btn-primary nav-signin-btn">Sign Out</a>
+                <div class="user-avatar-dropdown">
+                    <?php
+                    $user = $_SESSION['user'];
+                    $avatar = '';
+                    $initials = strtoupper(substr($user['username'] ?? 'U', 0, 1));
+                    
+                    if (!empty($user['avatar_url'])) {
+                        // Use Google avatar if available
+                        $avatar = '<img src="'.htmlspecialchars($user['avatar_url']).'" alt="Profile" class="avatar-img">';
+                    } else {
+                        // Use initials avatar
+                        $avatar = '<div class="avatar-initial">'.$initials.'</div>';
+                    }
+                    ?>
+                    <div class="avatar-container">
+                        <?php echo $avatar; ?>
+                    </div>
+                    <div class="dropdown-content">
+                        <a href="/profile"><i class="fas fa-user"></i> My Profile</a>
+                        <a href="/settings"><i class="fas fa-cog"></i> Settings</a>
+                        <div class="dropdown-divider"></div>
+                        <a href="/logout"><i class="fas fa-sign-out-alt"></i> Sign Out</a>
+                    </div>
+                </div>
             <?php endif; ?>
             <div class="mobile-menu-toggle">
                 <span></span>
@@ -164,6 +187,99 @@
         transform: scale(1.2);
     }
 
+    /* User Avatar & Dropdown Styles */
+    .user-avatar-dropdown {
+        position: relative;
+        cursor: pointer;
+    }
+
+    .avatar-container {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        border: 2px solid var(--imperial-purple);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .user-avatar-dropdown:hover .avatar-container {
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(75, 40, 109, 0.2);
+    }
+
+    .avatar-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .avatar-initial {
+        background: linear-gradient(135deg, var(--imperial-purple), var(--aged-gold));
+        color: white;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 18px;
+    }
+
+    .dropdown-content {
+        position: absolute;
+        top: 50px;
+        right: 0;
+        background-color: white;
+        min-width: 200px;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        overflow: hidden;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(10px);
+        transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s ease;
+        z-index: 1001;
+    }
+
+    .user-avatar-dropdown:hover .dropdown-content {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+
+    .dropdown-content a {
+        display: flex;
+        align-items: center;
+        padding: 12px 20px;
+        color: var(--charcoal-velvet);
+        text-decoration: none;
+        font-size: 14px;
+        transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .dropdown-content a i {
+        margin-right: 10px;
+        font-size: 16px;
+        width: 20px;
+        text-align: center;
+        color: var(--imperial-purple);
+    }
+
+    .dropdown-content a:hover {
+        background-color: #f8f5ff;
+        color: var(--imperial-purple);
+    }
+
+    .dropdown-divider {
+        height: 1px;
+        background-color: #eee;
+        margin: 5px 0;
+    }
+
     .mobile-menu-toggle {
         display: none;
         flex-direction: column;
@@ -261,6 +377,19 @@
             display: none;
         }
 
+        .user-avatar-dropdown {
+            position: fixed;
+            top: 20px;
+            right: 70px;
+            z-index: 1002;
+        }
+
+        .dropdown-content {
+            position: fixed;
+            top: 70px;
+            right: 60px;
+        }
+
         .nav-links li {
             width: 100%;
         }
@@ -314,5 +443,27 @@
         navItems.forEach((item, index) => {
             item.style.transitionDelay = `${0.1 + index * 0.1}s`;
         });
+
+        // Allow dropdown to be toggled on mobile
+        const avatarDropdown = document.querySelector('.user-avatar-dropdown');
+        
+        if(avatarDropdown) {
+            avatarDropdown.addEventListener('click', function(e) {
+                const dropdownContent = this.querySelector('.dropdown-content');
+                
+                // For touch devices, toggle visibility on click
+                if(window.innerWidth <= 992) {
+                    if(dropdownContent.style.opacity === '1') {
+                        dropdownContent.style.opacity = '0';
+                        dropdownContent.style.visibility = 'hidden';
+                        dropdownContent.style.transform = 'translateY(10px)';
+                    } else {
+                        dropdownContent.style.opacity = '1';
+                        dropdownContent.style.visibility = 'visible';
+                        dropdownContent.style.transform = 'translateY(0)';
+                    }
+                }
+            });
+        }
     });
 </script>

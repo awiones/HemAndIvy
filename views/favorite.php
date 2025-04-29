@@ -1,24 +1,28 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../config/config.php';
 global $pdo;
-$stmt = $pdo->query("SELECT * FROM auctions WHERE status = 'active' ORDER BY created_at DESC");
-$auctions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch user's favorites if logged in
-$favoritedIds = [];
-if (session_status() === PHP_SESSION_NONE) session_start();
-if (!empty($_SESSION['user'])) {
-    $userId = $_SESSION['user']['id'];
-    $favStmt = $pdo->prepare("SELECT auction_id FROM favorites WHERE user_id = ?");
-    $favStmt->execute([$userId]);
-    $favoritedIds = $favStmt->fetchAll(PDO::FETCH_COLUMN, 0);
+$user = $_SESSION['user'] ?? null;
+$favorites = [];
+
+if ($user) {
+    $stmt = $pdo->prepare("
+        SELECT a.*
+        FROM favorites f
+        JOIN auctions a ON f.auction_id = a.id
+        WHERE f.user_id = ?
+        ORDER BY f.created_at DESC
+    ");
+    $stmt->execute([$user['id']]);
+    $favorites = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Auctions - Hem & Ivy</title>
+    <title>My Favorites - Hem & Ivy</title>
     <link rel="stylesheet" href="/assets/css/home.css">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -28,21 +32,20 @@ if (!empty($_SESSION['user'])) {
 <section class="bids-section">
     <div class="container">
         <div class="section-header">
-            <h2 class="section-title">Live Auctions</h2>
-            <p class="section-subtitle">Bid on unique, rare, and one-of-a-kind fashion pieces.</p>
+            <h2 class="section-title">My Favorites</h2>
+            <p class="section-subtitle">Your favorited auctions are listed below.</p>
         </div>
         <div class="bids-grid">
-            <?php if (empty($auctions)): ?>
-                <p style="grid-column: 1/-1; text-align:center;">No auctions available.</p>
+            <?php if (!$user): ?>
+                <p style="grid-column: 1/-1; text-align:center;">You must be logged in to view your favorites.</p>
+            <?php elseif (empty($favorites)): ?>
+                <p style="grid-column: 1/-1; text-align:center;">No favorites yet.</p>
             <?php else: ?>
-                <?php foreach ($auctions as $auction): ?>
+                <?php foreach ($favorites as $auction): ?>
                 <div class="bid-card">
                     <?php
-                        // Ensure image path is correct and file exists
                         $imgPath = $auction['image'];
-                        // Remove possible duplicate slashes
                         $imgPath = preg_replace('#/+#','/',$imgPath);
-                        // Fix: Check in /public if path starts with /uploads/
                         $imgFile = null;
                         if (strpos($imgPath, '/uploads/') === 0) {
                             $imgFile = realpath(__DIR__ . '/../public' . $imgPath);
@@ -58,16 +61,12 @@ if (!empty($_SESSION['user'])) {
                         </div>
                     <?php endif; ?>
                     <div class="bid-content">
-                        <?php if (!empty($auction['category']) || !empty($auction['rarity'])): ?>
-                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                                <?php if (!empty($auction['category'])): ?>
-                                    <div class="bid-category"><?= htmlspecialchars($auction['category']) ?></div>
-                                <?php endif; ?>
-                                <?php if (!empty($auction['rarity'])): ?>
-                                    <div class="bid-category" style="color:var(--sage-green);font-size:12px;text-transform:uppercase;letter-spacing:1px;">
-                                        <?= htmlspecialchars($auction['rarity']) ?>
-                                    </div>
-                                <?php endif; ?>
+                        <?php if (!empty($auction['category'])): ?>
+                            <div class="bid-category"><?= htmlspecialchars($auction['category']) ?></div>
+                        <?php endif; ?>
+                        <?php if (!empty($auction['rarity'])): ?>
+                            <div class="bid-category" style="color:var(--sage-green);font-size:12px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">
+                                <?= htmlspecialchars($auction['rarity']) ?>
                             </div>
                         <?php endif; ?>
                         <h3 class="bid-title"><?= htmlspecialchars($auction['title']) ?></h3>
@@ -76,7 +75,6 @@ if (!empty($_SESSION['user'])) {
                             <span class="bid-amount">$<?= number_format($auction['price'], 2) ?></span>
                         </div>
                         <?php
-                        // Show time left if end_time is set and in the future
                         if (!empty($auction['end_time'])) {
                             $now = new DateTime();
                             $end = new DateTime($auction['end_time']);
@@ -101,7 +99,7 @@ if (!empty($_SESSION['user'])) {
                                 Place Bid
                             </button>
                             <button class="bid-favorite" data-auction-id="<?= (int)$auction['id'] ?>">
-                                <i class="<?= in_array($auction['id'], $favoritedIds) ? 'fas' : 'far' ?> fa-heart"></i>
+                                <i class="fas fa-heart"></i>
                             </button>
                         </div>
                     </div>
@@ -113,7 +111,7 @@ if (!empty($_SESSION['user'])) {
 </section>
 <?php include __DIR__ . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'footer.php'; ?>
 <script>
-    // Favorite button AJAX
+    // Favorite button AJAX for unfavorite (remove from favorites)
     document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.bid-favorite').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
@@ -130,15 +128,10 @@ if (!empty($_SESSION['user'])) {
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        const icon = btn.querySelector('i');
+                        // Remove the card from the grid if unfavorited
                         if (data.favorited === false) {
-                            icon.classList.remove('fas');
-                            icon.classList.add('far');
-                            btn.title = 'Add to favorites';
-                        } else {
-                            icon.classList.remove('far');
-                            icon.classList.add('fas');
-                            btn.title = 'Favorited!';
+                            const card = btn.closest('.bid-card');
+                            if (card) card.remove();
                         }
                     } else if (data.error) {
                         alert(data.error);

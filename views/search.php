@@ -1,8 +1,14 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 global $pdo;
+
+// Fetch all active auctions
 $stmt = $pdo->query("SELECT * FROM auctions WHERE status = 'active' ORDER BY created_at DESC");
 $auctions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch all unique categories for dropdown
+$catStmt = $pdo->query("SELECT DISTINCT category FROM auctions WHERE category IS NOT NULL AND category != '' ORDER BY category ASC");
+$allCategories = $catStmt->fetchAll(PDO::FETCH_COLUMN);
 
 // Fetch user's favorites if logged in
 $favoritedIds = [];
@@ -18,7 +24,7 @@ if (!empty($_SESSION['user'])) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Auctions - Hem & Ivy</title>
+    <title>Browse Auctions - Hem & Ivy</title>
     <link rel="stylesheet" href="/assets/css/home.css">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -28,21 +34,35 @@ if (!empty($_SESSION['user'])) {
 <section class="bids-section">
     <div class="container">
         <div class="section-header">
-            <h2 class="section-title">Live Auctions</h2>
-            <p class="section-subtitle">Bid on unique, rare, and one-of-a-kind fashion pieces.</p>
+            <h2 class="section-title">Browse Auctions</h2>
+            <p class="section-subtitle">Search and explore all available auctions.</p>
         </div>
-        <div class="bids-grid">
+        <!-- Replace the old search/filter bar with the new markup -->
+        <div class="search-filter-container">
+            <div class="search-bar">
+                <i class="fas fa-search search-icon"></i>
+                <input id="auction-search-input" type="text" placeholder="Search auctions..." class="search-input">
+            </div>
+            <div class="category-filter">
+                <select id="auction-category-select" class="category-select">
+                    <option value="">All Categories</option>
+                    <?php foreach ($allCategories as $cat): ?>
+                        <option value="<?= htmlspecialchars($cat) ?>"><?= htmlspecialchars($cat) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <i class="fas fa-chevron-down select-icon"></i>
+            </div>
+            <button id="auction-search-btn" class="btn btn-primary search-btn">Search</button>
+        </div>
+        <div class="bids-grid" id="auctions-grid">
             <?php if (empty($auctions)): ?>
                 <p style="grid-column: 1/-1; text-align:center;">No auctions available.</p>
             <?php else: ?>
                 <?php foreach ($auctions as $auction): ?>
-                <div class="bid-card">
+                <div class="bid-card" data-category="<?= htmlspecialchars($auction['category']) ?>">
                     <?php
-                        // Ensure image path is correct and file exists
                         $imgPath = $auction['image'];
-                        // Remove possible duplicate slashes
                         $imgPath = preg_replace('#/+#','/',$imgPath);
-                        // Fix: Check in /public if path starts with /uploads/
                         $imgFile = null;
                         if (strpos($imgPath, '/uploads/') === 0) {
                             $imgFile = realpath(__DIR__ . '/../public' . $imgPath);
@@ -76,7 +96,6 @@ if (!empty($_SESSION['user'])) {
                             <span class="bid-amount">$<?= number_format($auction['price'], 2) ?></span>
                         </div>
                         <?php
-                        // Show time left if end_time is set and in the future
                         if (!empty($auction['end_time'])) {
                             $now = new DateTime();
                             $end = new DateTime($auction['end_time']);
@@ -146,6 +165,31 @@ if (!empty($_SESSION['user'])) {
                 });
             });
         });
+
+        // Auction search with category filter
+        const searchInput = document.getElementById('auction-search-input');
+        const searchBtn = document.getElementById('auction-search-btn');
+        const categorySelect = document.getElementById('auction-category-select');
+        const grid = document.getElementById('auctions-grid');
+        if (searchInput && searchBtn && grid && categorySelect) {
+            function filterAuctions() {
+                const q = searchInput.value.trim().toLowerCase();
+                const cat = categorySelect.value;
+                grid.querySelectorAll('.bid-card').forEach(card => {
+                    const title = card.querySelector('.bid-title')?.textContent?.toLowerCase() || '';
+                    const cardCat = card.getAttribute('data-category') || '';
+                    const matchCat = !cat || cardCat === cat;
+                    const matchTitle = !q || title.includes(q);
+                    card.style.display = (matchCat && matchTitle) ? '' : 'none';
+                });
+            }
+            searchBtn.addEventListener('click', filterAuctions);
+            searchInput.addEventListener('keyup', function(e) {
+                if (e.key === 'Enter') filterAuctions();
+                if (!searchInput.value) filterAuctions();
+            });
+            categorySelect.addEventListener('change', filterAuctions);
+        }
     });
 </script>
 </body>

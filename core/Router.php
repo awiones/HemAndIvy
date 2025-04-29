@@ -60,12 +60,28 @@ class Router {
             }
         }
 
-        // Handle routes
+        // Handle exact routes
         if (isset($this->routes[$method][$url])) {
             call_user_func($this->routes[$method][$url]);
-        } else {
-            http_response_code(404);
-            require __DIR__ . '/../views/errors/404.php';
+            return;
         }
+
+        // Handle dynamic /biding/{slug} route for GET
+        if ($method === 'GET' && preg_match('#^/biding/([^/]+)$#', $url, $matches)) {
+            $_GET['biding_slug'] = $matches[1];
+            require __DIR__ . '/../views/biding.php';
+            return;
+        }
+
+        // Handle dynamic /biding/{slug} route for POST
+        if ($method === 'POST' && preg_match('#^/biding/([^/]+)$#', $url, $matches)) {
+            $_GET['biding_slug'] = $matches[1];
+            require __DIR__ . '/../views/biding.php';
+            return;
+        }
+
+        // Not found
+        http_response_code(404);
+        require __DIR__ . '/../views/errors/404.php';
     }
 }
