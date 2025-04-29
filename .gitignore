@@ -1,6 +1,6 @@
 .qodo
 .env
 uploads
-vendor
+vendor/
 composer.json
 composer.lock
