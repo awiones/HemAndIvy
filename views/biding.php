@@ -5,10 +5,15 @@ global $pdo;
 // Get slug from router
 $slug = $_GET['biding_slug'] ?? '';
 
-// Find auction by slugified title
+// Find auction by slugified title that hasn't ended more than 1 day ago
 $auction = null;
 if ($slug) {
-    $stmt = $pdo->query("SELECT * FROM auctions WHERE status = 'active'");
+    $stmt = $pdo->query("SELECT * FROM auctions 
+        WHERE status = 'active' 
+        AND (
+            end_time IS NULL 
+            OR end_time > DATE_SUB(NOW(), INTERVAL 1 DAY)
+        )");
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $titleSlug = strtolower(preg_replace('/[^a-z0-9]+/', '-', $row['title']));
         if ($slug === $titleSlug) {

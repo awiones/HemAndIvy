@@ -320,6 +320,25 @@ $router->get('/admin/users/delete', function() {
     require __DIR__ . '/../admin/users_delete.php';
 });
 
+// Add admin approvals route
+$router->get('/admin/approvals', function() {
+    if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+        http_response_code(403);
+        require __DIR__ . '/../views/errors/403.php';
+        exit;
+    }
+    require __DIR__ . '/../admin/approvals.php';
+});
+
+$router->post('/admin/approvals', function() {
+    if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+        http_response_code(403);
+        require __DIR__ . '/../views/errors/403.php';
+        exit;
+    }
+    require __DIR__ . '/../admin/approvals.php';
+});
+
 // Auction routes
 $router->get('/auctions', function() {
     require __DIR__ . '/../views/auctions/index.php';
@@ -376,6 +395,29 @@ $router->get('/admin/activity', function() {
 
 $router->get('/favorite', function() {
     require __DIR__ . '/../views/favorite.php';
+});
+
+// User settings route (must be under /users/settings)
+$router->get('/users/settings', function() {
+    require __DIR__ . '/../views/users/settings.php';
+});
+
+$router->post('/users/settings', function() {
+    require __DIR__ . '/../views/users/settings.php';
+});
+
+// Add profile route
+$router->get('/users/profile', function() {
+    require __DIR__ . '/../views/users/profile.php';
+});
+
+// Add become-seller routes
+$router->get('/users/become-seller', function() {
+    require __DIR__ . '/../views/users/become-seller.php';
+});
+
+$router->post('/users/become-seller', function() {
+    require __DIR__ . '/../views/users/become-seller.php';
 });
 
 // Add favorite route (for AJAX POST)

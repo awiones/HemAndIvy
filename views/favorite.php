@@ -12,6 +12,10 @@ if ($user) {
         FROM favorites f
         JOIN auctions a ON f.auction_id = a.id
         WHERE f.user_id = ?
+        AND (
+            a.end_time IS NULL 
+            OR a.end_time > DATE_SUB(NOW(), INTERVAL 1 DAY)
+        )
         ORDER BY f.created_at DESC
     ");
     $stmt->execute([$user['id']]);

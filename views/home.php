@@ -2,7 +2,16 @@
 require_once __DIR__ . '/../config/config.php';
 global $pdo;
 // Fetch 6 most recent active auctions
-$stmt = $pdo->query("SELECT * FROM auctions WHERE status = 'active' ORDER BY created_at DESC LIMIT 6");
+$stmt = $pdo->query("
+    SELECT * FROM auctions 
+    WHERE status = 'active' 
+    AND (
+        end_time IS NULL 
+        OR end_time > DATE_SUB(NOW(), INTERVAL 1 DAY)
+    )
+    ORDER BY created_at DESC 
+    LIMIT 6
+");
 $auctions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch categories and item counts, and a random image for each category
@@ -216,7 +225,7 @@ if (!empty($_SESSION['user'])) {
                 <?php endif; ?>
             </div>
             <div class="categories-cta">
-                <a href="/categories" class="btn btn-outline">View All Categories</a>
+                <a href="/collections" class="btn btn-outline">View All Categories</a>
             </div>
         </div>
     </section>

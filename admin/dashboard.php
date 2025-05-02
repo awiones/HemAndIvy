@@ -63,6 +63,70 @@ if ($auctionsLastMonth > 0) {
     $auctionsPercentChange = 100;
 }
 
+// Get pending requests for dashboard
+$stmt = $pdo->query("
+    SELECT 
+        CASE 
+            WHEN sr.id IS NOT NULL THEN 'seller'
+            WHEN ar.id IS NOT NULL THEN 'auction'
+            ELSE 'other'
+        END as request_type,
+        COALESCE(sr.id, ar.id) as id,
+        COALESCE(sr.user_id, ar.user_id) as user_id,
+        COALESCE(sr.status, ar.status) as status,
+        COALESCE(sr.created_at, ar.created_at) as created_at,
+        u.username,
+        sr.business_name,
+        ar.title as auction_title
+    FROM users u
+    LEFT JOIN seller_requests sr ON u.id = sr.user_id
+    LEFT JOIN auction_requests ar ON u.id = ar.user_id
+    WHERE COALESCE(sr.status, ar.status) = 'pending'
+    ORDER BY created_at DESC
+    LIMIT 5
+");
+$pending_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Handle approval/rejection via AJAX
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
+    $request_id = $_POST['request_id'] ?? null;
+    $action = $_POST['action'] ?? null;
+    $user_id = $_POST['user_id'] ?? null;
+    $request_type = $_POST['request_type'] ?? null;
+
+    if ($request_id && $action && $user_id) {
+        try {
+            $pdo->beginTransaction();
+            
+            if ($request_type === 'seller') {
+                // Update seller request status
+                $stmt = $pdo->prepare("UPDATE seller_requests SET status = ? WHERE id = ?");
+                $stmt->execute([$action, $request_id]);
+
+                if ($action === 'approved') {
+                    $stmt = $pdo->prepare("UPDATE users SET role = 'seller', seller_status = 'approved' WHERE id = ?");
+                    $stmt->execute([$user_id]);
+                } else {
+                    $stmt = $pdo->prepare("UPDATE users SET seller_status = 'rejected' WHERE id = ?");
+                    $stmt->execute([$user_id]);
+                }
+            } else if ($request_type === 'auction') {
+                // Update auction request status
+                $stmt = $pdo->prepare("UPDATE auction_requests SET status = ? WHERE id = ?");
+                $stmt->execute([$action, $request_id]);
+            }
+
+            $pdo->commit();
+            echo json_encode(['success' => true]);
+            exit;
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            echo json_encode(['success' => false, 'error' => 'An error occurred']);
+            exit;
+        }
+    }
+}
+
 $stats = [
     'users' => $totalUsers,
     'usersPercentChange' => $usersPercentChange,
@@ -135,6 +199,70 @@ try {
     <link rel="stylesheet" href="/assets/css/admin.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="icon" href="/assets/images/favicon.ico" type="image/x-icon">
+    <style>
+        .approval-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: var(--imperial-purple);
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .approval-icon svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .btn-approve, .btn-reject {
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-approve {
+            background-color: var(--success-green);
+            color: white;
+        }
+
+        .btn-reject {
+            background-color: #f8f9fa;
+            color: var(--danger-red);
+            border: 1px solid var(--danger-red);
+        }
+
+        .btn-approve:hover {
+            background-color: #218838;
+        }
+
+        .btn-reject:hover {
+            background-color: var(--danger-red);
+            color: white;
+        }
+
+        .btn-view {
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            background-color: var(--imperial-purple);
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-view:hover {
+            background-color: var(--imperial-purple-light);
+        }
+    </style>
 </head>
 <body>
     <div class="admin-layout">
@@ -304,37 +432,47 @@ try {
                             </div>
                             <div class="card-body">
                                 <div class="approval-items">
-                                    <div class="approval-item">
-                                        <div class="approval-icon auction">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                                            </svg>
+                                    <?php if (!empty($pending_requests)): ?>
+                                        <?php foreach ($pending_requests as $request): ?>
+                                            <div class="approval-item" id="request-<?= $request['id'] ?>">
+                                                <div class="approval-icon">
+                                                    <?php if ($request['request_type'] === 'seller'): ?>
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                                            <circle cx="12" cy="7" r="4"></circle>
+                                                        </svg>
+                                                    <?php else: ?>
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                                                            <polyline points="2 17 12 22 22 17"></polyline>
+                                                            <polyline points="2 12 12 17 22 12"></polyline>
+                                                        </svg>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div class="approval-details">
+                                                    <p class="approval-title">
+                                                        <?php if ($request['request_type'] === 'seller'): ?>
+                                                            Seller Verification
+                                                        <?php else: ?>
+                                                            <?= htmlspecialchars($request['auction_title']) ?>
+                                                        <?php endif; ?>
+                                                    </p>
+                                                    <p class="approval-info">
+                                                        Requested by <strong><?= htmlspecialchars($request['username']) ?></strong>
+                                                    </p>
+                                                </div>
+                                                <div class="approval-actions">
+                                                    <a href="/admin/approvals" class="btn-view">
+                                                        View
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <div class="approval-item" style="justify-content: center;">
+                                            <p>No pending approvals</p>
                                         </div>
-                                        <div class="approval-details">
-                                            <p class="approval-title">Fine Art Painting (Landscape)</p>
-                                            <p class="approval-info">Posted by <strong>JamesDoe</strong></p>
-                                        </div>
-                                        <div class="approval-actions">
-                                            <button class="approve-btn">Approve</button>
-                                            <button class="reject-btn">Reject</button>
-                                        </div>
-                                    </div>
-                                    <div class="approval-item">
-                                        <div class="approval-icon user">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                                <circle cx="12" cy="7" r="4"></circle>
-                                            </svg>
-                                        </div>
-                                        <div class="approval-details">
-                                            <p class="approval-title">Seller Verification</p>
-                                            <p class="approval-info">Requested by <strong>EmilyW</strong></p>
-                                        </div>
-                                        <div class="approval-actions">
-                                            <button class="approve-btn">Approve</button>
-                                            <button class="reject-btn">Reject</button>
-                                        </div>
-                                    </div>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>

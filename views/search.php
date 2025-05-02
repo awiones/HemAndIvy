@@ -2,8 +2,14 @@
 require_once __DIR__ . '/../config/config.php';
 global $pdo;
 
-// Fetch all active auctions
-$stmt = $pdo->query("SELECT * FROM auctions WHERE status = 'active' ORDER BY created_at DESC");
+// Fetch all active auctions that haven't ended more than 1 day ago
+$stmt = $pdo->query("SELECT * FROM auctions 
+    WHERE status = 'active' 
+    AND (
+        end_time IS NULL 
+        OR end_time > DATE_SUB(NOW(), INTERVAL 1 DAY)
+    )
+    ORDER BY created_at DESC");
 $auctions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch all unique categories for dropdown

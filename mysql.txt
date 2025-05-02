@@ -8,7 +8,11 @@ CREATE TABLE `users` (
     `google_id` VARCHAR(64) NULL UNIQUE,
     `avatar_url` VARCHAR(255) NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+    `updated_at` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    `seller_status` ENUM('none', 'pending', 'approved', 'rejected') DEFAULT 'none',
+    `business_name` VARCHAR(100) NULL,
+    `business_description` TEXT NULL,
+    `phone` VARCHAR(20) NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Add columns for Google OAuth support
@@ -19,6 +23,7 @@ ALTER TABLE `users`
 -- Auctions table
 CREATE TABLE `auctions` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `seller_id` INT UNSIGNED NOT NULL,
     `title` VARCHAR(255) NOT NULL,
     `price` DECIMAL(10,2) NOT NULL,
     `description` TEXT NOT NULL,
@@ -29,6 +34,13 @@ CREATE TABLE `auctions` (
     `end_time` DATETIME NULL,
     `category_id` INT UNSIGNED NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Add seller_id to auctions table
+ALTER TABLE `auctions`
+    ADD COLUMN `seller_id` INT UNSIGNED NOT NULL AFTER `id`,
+    ADD CONSTRAINT `fk_auctions_seller`
+    FOREIGN KEY (`seller_id`) REFERENCES `users`(`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- Categories table (stores unique category names)
 CREATE TABLE `categories` (
@@ -80,3 +92,34 @@ CREATE TABLE `bids` (
     FOREIGN KEY (`auction_id`) REFERENCES `auctions`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Create seller_requests table
+CREATE TABLE seller_requests (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    business_name VARCHAR(100) NOT NULL,
+    business_description TEXT NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Create auction_requests table
+CREATE TABLE auction_requests (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    rarity VARCHAR(50) NOT NULL,
+    image VARCHAR(255) NOT NULL,
+    category_id INT UNSIGNED NULL,
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

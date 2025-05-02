@@ -11,7 +11,12 @@
                 <li><a href="/auction"><i class="fas fa-gavel"></i> Auctions</a></li>
                 <li><a href="/collections"><i class="fas fa-tshirt"></i> Collections</a></li>
                 <li><a href="/about"><i class="fas fa-info-circle"></i> About</a></li>
-                <li><a href="/favorite"><i class="fas fa-heart"></i> Favorites</a></li>
+                <?php if (!empty($_SESSION['user'])): ?>
+                    <li><a href="/favorite"><i class="fas fa-heart"></i> Favorites</a></li>
+                <?php else: ?>
+                    <li><a href="/login"><i class="fas fa-sign-in-alt"></i> Login</a></li>
+                    <li><a href="/register"><i class="fas fa-user-plus"></i> Register</a></li>
+                <?php endif; ?>
             </ul>
             <?php if (empty($_SESSION['user'])): ?>
                 <a href="/login" class="btn btn-primary nav-signin-btn">Sign In</a>
@@ -34,8 +39,8 @@
                         <?php echo $avatar; ?>
                     </div>
                     <div class="dropdown-content">
-                        <a href="/profile"><i class="fas fa-user"></i> My Profile</a>
-                        <a href="/settings"><i class="fas fa-cog"></i> Settings</a>
+                        <a href="/users/profile"><i class="fas fa-user"></i> My Profile</a>
+                        <a href="/users/settings"><i class="fas fa-cog"></i> Settings</a>
                         <div class="dropdown-divider"></div>
                         <a href="/logout"><i class="fas fa-sign-out-alt"></i> Sign Out</a>
                     </div>
